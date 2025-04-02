@@ -1,0 +1,4 @@
+MODULEPATH=/opt/amazon/modules/modulefiles:/usr/share/Modules/modulefiles:/etc/modulefiles
+MODULESHOME=/usr/share/Modules
+PATH="/opt/amazon/openmpi5/bin:/opt/amazon/openmpi/bin:/opt/amazon/efa/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/ec2-user/.local/bin:/home/ec2-user/bin"
+LD_LIBRARY_PATH="/opt/amazon/openmpi5/lib64:/opt/amazon/openmpi5/lib:/opt/amazon/efa/lib64"
