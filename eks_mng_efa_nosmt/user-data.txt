@@ -1,0 +1,127 @@
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="
+--==MYBOUNDARY==
+Content-Type: text/x-shellscript; charset="us-ascii"
+#!/bin/bash
+
+## Set CNI environment variables
+#echo 'export AWS_VPC_K8S_CNI_LOGLEVEL=DEBUG' >> /etc/environment
+#echo 'export AWS_VPC_K8S_CNI_LOG_FILE=/var/log/aws-routed-eni/ipamd.log' >> /etc/environment
+#echo 'export AWS_VPC_K8S_PLUGIN_LOG_LEVEL=DEBUG' >> /etc/environment
+#echo 'export AWS_VPC_K8S_PLUGIN_LOG_FILE=/var/log/aws-routed-eni/plugin.log' >> /etc/environment
+#echo 'export ADDITIONAL_ENI_TAGS={}' >> /etc/environment
+#echo 'export AWS_VPC_K8S_CNI_EXTERNALSNAT=false' >> /etc/environment
+#echo 'export AWS_VPC_K8S_CNI_VETHPREFIX=eni' >> /etc/environment
+#echo 'export AWS_VPC_ENI_MTU=9001' >> /etc/environment
+#echo 'export AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS=10.0.0.0/16' >> /etc/environment
+#
+## Create CNI directories early
+#mkdir -p /etc/cni/net.d
+#mkdir -p /opt/cni/bin
+#mkdir -p /var/log/aws-routed-eni
+#
+## Create CNI configuration file
+#cat > /etc/cni/net.d/10-aws.conflist << 'CNIEOF'
+#{
+#  "cniVersion": "0.4.0",
+#  "name": "aws-cni",
+#  "plugins": [
+#    {
+#      "name": "aws-cni",
+#      "type": "aws-cni",
+#      "vethPrefix": "eni",
+#      "mtu": "9001",
+#      "pluginLogFile": "/var/log/aws-routed-eni/plugin.log",
+#      "pluginLogLevel": "DEBUG"
+#    },
+#    {
+#      "type": "portmap",
+#      "capabilities": {"portMappings": true},
+#      "snat": true
+#    }
+#  ]
+#}
+#CNIEOF
+#
+## Make sure necessary kernel modules are loaded
+#modprobe overlay
+#modprobe br_netfilter
+#
+## Set kernel parameters required for Kubernetes networking
+#cat > /etc/sysctl.d/99-kubernetes.conf << 'SYSCTLEOF'
+#net.bridge.bridge-nf-call-iptables = 1
+#net.bridge.bridge-nf-call-ip6tables = 1
+#net.ipv4.ip_forward = 1
+#SYSCTLEOF
+#sysctl --system
+#
+## Install troubleshooting tools
+#yum install -y tcpdump bind-utils nc
+#
+## Fix potential SELinux issues
+#if [ -f /etc/selinux/config ]; then
+#  setenforce 0
+#  sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+#fi
+#
+## Fix permissions on CNI directories
+#chmod 755 /etc/cni/net.d
+#chmod 755 /opt/cni/bin
+#
+## Fix DNS resolution for EC2 endpoint
+#echo '127.0.0.1 localhost' > /etc/hosts
+#hostname -I | awk '{print $1 " blik"}' >> /etc/hosts
+#
+## Add EC2 endpoint to hosts file
+#EC2_IP=$(getent hosts ec2.us-west-2.amazonaws.com | awk '{print $1}')
+#if [ -z "$EC2_IP" ]; then
+#  echo "# Using VPC endpoint for EC2" >> /etc/hosts
+#  echo "10.0.0.2 ec2.us-west-2.amazonaws.com" >> /etc/hosts
+#fi
+#
+## Configure DNS resolvers to use Amazon DNS
+#cat > /etc/resolv.conf << 'RESOLVCONF'
+#nameserver 169.254.169.253
+#options timeout:2 attempts:5
+#RESOLVCONF
+#
+## Add AWS metadata endpoint
+#echo "169.254.169.254 metadata.eth0.ec2.internal" >> /etc/hosts
+#
+## Test DNS resolution before bootstrap
+#echo "Testing DNS resolution before bootstrap..."
+#nslookup ec2.us-west-2.amazonaws.com
+#nslookup eks.us-west-2.amazonaws.com
+#
+## Pre-pull container images to speed up pod startup
+#echo "Pre-pulling critical container images..."
+#crictl pull public.ecr.aws/eks-distro/kubernetes/pause:3.5
+#
+## Set correct file permissions for AWS CNI plugin
+#mkdir -p /var/run/aws-node
+#chmod 755 /var/run/aws-node
+#
+## Static cluster information
+CLUSTER_NAME="hpc-custom"
+API_SERVER_URL="https://CF726698AD3705023FE0B43952F2957B.gr7.us-west-2.eks.amazonaws.com"
+B64_CLUSTER_CA="LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJUUplWDdBM3AyNHd3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TlRBek1UTXhOek0xTXpGYUZ3MHpOVEF6TVRFeE56UXdNekZhTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUURUcFVKVEFXdmpVL1JGY2tVdS82K3NvUnF0OWNCcUErL21qSS9HTGtKeDYwVzZaNUNwRVFUbHlGWXYKUFRUd3B3UzNrdm1ZcElTUWZVQ0JwSE1MZXFTcE5iQkZwUFRiT3Z1NEJtNTZNSzZPU2VLY0loalFWUmRDeFNkdQpoNTlJQzZjSTVBZEdYSUxGSWJIaUplVnBSdmNOSklhSDEwZVZjdHhJY3Y1RkQ4ZWpJVUxoRFJQYkk0OVU4MDFjCjJnNUZReklPaExsY1ZKOUZKeDlqNkNhMDA2NExNYzV6Z2dtdGJhcXB5clZaNlAyUUF3TzUvdkhnSk5MZHJoeUMKZFNaa3NWb2pmV1UrM24vdFk2ODhLU3FPZUI5cVl1dGJ0TFE4REVCbHRiQURSUVkxbGhpWmxEVnkvcEtxTmRXdwp5MEJyVkt4cW9jS2ttWFE4dEJldnYwVFM1cWlkQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJTemdxMVA3NkgrVUFTcmtqTkJqaFlQZTJ6RnZ6QVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQnRXdG9kcE5SQwpQUDNVSlBGS1RlR0RFbmhkL1k0S0NvR25LRlBPWFVIVVovMTN4OGFkUEg1VnJaWDZ6TVVEYXVNUk41VzdUdzVCCmRHU0M0bnF2TjkyeDc4Sm9rVzhjSlN0dlVpYWZTc1Y1OUE3UTZjUy9pdUk2ZXRXajg4ZTZNSnhrTWdHb0V4RTcKZEhROEFUeUZwNktOdjh5YXJBSldoeTdMamxEbHM1VGtjckM1Z3JRYmNYcm5qYlEvR1FIUUorZnQ5SnVTMDJXTAp6dkVzakJ5R0pXWEtFS0p0V0RvTW96VjczR1p6SXVnRUdDSSszWm5QQ2tLWGtkL1g0akt5S29tbVR5SDBTK0hQCklTV3dtQklUcEswTytGNDZJSjlWWmdZcUVFTzVsZFcwQXBkVjZyYWQxeDJCeS94eUs4RFpKbmFiaDRNQU5LVHoKZkNlYUkxczBuVjdlCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K"
+
+# Bootstrap the node with the provided information
+/etc/eks/bootstrap.sh $CLUSTER_NAME \
+  --b64-cluster-ca $B64_CLUSTER_CA \
+  --apiserver-endpoint $API_SERVER_URL \
+  --kubelet-extra-args '--cpu-manager-policy=static --feature-gates=CPUManagerPolicyOptions=true,CPUManagerPolicyAlphaOptions=true --cpu-manager-policy-options=strict-cpu-reservation=true --reserved-cpus=0,1,2,3 --kube-reserved=cpu=1000m,memory=1Gi,ephemeral-storage=1Gi --system-reserved=cpu=1000m,memory=1Gi,ephemeral-storage=1Gi'
+#"--feature-gates=CPUManagerPolicyAlphaOptions=true \
+#  --cpu-manager-policy=static \
+#  --kube-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi \
+#  --system-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi \
+#  --eviction-hard=memory.available<200Mi,nodefs.available<10% \
+#  --feature-gates=CPUManager=true \
+#  --cpu-manager-reconcile-period=5s \
+#  --topology-manager-policy=single-numa-node \
+#  --reserved-cpus=0,1 \
+#  --cpu-manager-policy-options=strict-cpu-reservation=true"
+
+# Restart kubelet to apply changes
+systemctl restart kubelet
+--==MYBOUNDARY==--
