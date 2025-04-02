@@ -4,70 +4,75 @@ Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="
 Content-Type: text/x-shellscript; charset="us-ascii"
 #!/bin/bash
 
-## Set CNI environment variables
-#echo 'export AWS_VPC_K8S_CNI_LOGLEVEL=DEBUG' >> /etc/environment
-#echo 'export AWS_VPC_K8S_CNI_LOG_FILE=/var/log/aws-routed-eni/ipamd.log' >> /etc/environment
-#echo 'export AWS_VPC_K8S_PLUGIN_LOG_LEVEL=DEBUG' >> /etc/environment
-#echo 'export AWS_VPC_K8S_PLUGIN_LOG_FILE=/var/log/aws-routed-eni/plugin.log' >> /etc/environment
-#echo 'export ADDITIONAL_ENI_TAGS={}' >> /etc/environment
-#echo 'export AWS_VPC_K8S_CNI_EXTERNALSNAT=false' >> /etc/environment
-#echo 'export AWS_VPC_K8S_CNI_VETHPREFIX=eni' >> /etc/environment
-#echo 'export AWS_VPC_ENI_MTU=9001' >> /etc/environment
-#echo 'export AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS=10.0.0.0/16' >> /etc/environment
-#
-## Create CNI directories early
-#mkdir -p /etc/cni/net.d
-#mkdir -p /opt/cni/bin
-#mkdir -p /var/log/aws-routed-eni
-#
-## Create CNI configuration file
-#cat > /etc/cni/net.d/10-aws.conflist << 'CNIEOF'
-#{
-#  "cniVersion": "0.4.0",
-#  "name": "aws-cni",
-#  "plugins": [
-#    {
-#      "name": "aws-cni",
-#      "type": "aws-cni",
-#      "vethPrefix": "eni",
-#      "mtu": "9001",
-#      "pluginLogFile": "/var/log/aws-routed-eni/plugin.log",
-#      "pluginLogLevel": "DEBUG"
-#    },
-#    {
-#      "type": "portmap",
-#      "capabilities": {"portMappings": true},
-#      "snat": true
-#    }
-#  ]
-#}
-#CNIEOF
-#
-## Make sure necessary kernel modules are loaded
-#modprobe overlay
-#modprobe br_netfilter
-#
-## Set kernel parameters required for Kubernetes networking
-#cat > /etc/sysctl.d/99-kubernetes.conf << 'SYSCTLEOF'
-#net.bridge.bridge-nf-call-iptables = 1
-#net.bridge.bridge-nf-call-ip6tables = 1
-#net.ipv4.ip_forward = 1
-#SYSCTLEOF
-#sysctl --system
-#
-## Install troubleshooting tools
-#yum install -y tcpdump bind-utils nc
-#
-## Fix potential SELinux issues
-#if [ -f /etc/selinux/config ]; then
-#  setenforce 0
-#  sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
-#fi
-#
-## Fix permissions on CNI directories
-#chmod 755 /etc/cni/net.d
-#chmod 755 /opt/cni/bin
-#
+# Set CNI environment variables
+echo 'export AWS_VPC_K8S_CNI_LOGLEVEL=DEBUG' >> /etc/environment
+echo 'export AWS_VPC_K8S_CNI_LOG_FILE=/var/log/aws-routed-eni/ipamd.log' >> /etc/environment
+echo 'export AWS_VPC_K8S_PLUGIN_LOG_LEVEL=DEBUG' >> /etc/environment
+echo 'export AWS_VPC_K8S_PLUGIN_LOG_FILE=/var/log/aws-routed-eni/plugin.log' >> /etc/environment
+echo 'export ADDITIONAL_ENI_TAGS={}' >> /etc/environment
+echo 'export AWS_VPC_K8S_CNI_EXTERNALSNAT=false' >> /etc/environment
+echo 'export AWS_VPC_K8S_CNI_VETHPREFIX=eni' >> /etc/environment
+echo 'export AWS_VPC_ENI_MTU=9001' >> /etc/environment
+echo 'export AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS=10.0.0.0/16' >> /etc/environment
+# Add EFA exclusion pattern - critical for EFA nodes
+echo 'export AWS_VPC_K8S_CNI_EXCLUDE_DEVICE_PATTERN=^eth1$' >> /etc/environment
+
+# Create CNI directories early
+mkdir -p /etc/cni/net.d
+mkdir -p /opt/cni/bin
+mkdir -p /var/log/aws-routed-eni
+mkdir -p /var/run/aws-node
+chmod 755 /var/run/aws-node
+
+# Create CNI configuration file
+cat > /etc/cni/net.d/10-aws.conflist << 'CNIEOF'
+{
+  "cniVersion": "0.4.0",
+  "name": "aws-cni",
+  "plugins": [
+    {
+      "name": "aws-cni",
+      "type": "aws-cni",
+      "vethPrefix": "eni",
+      "mtu": "9001",
+      "excludeDevicePattern": "^eth1$",
+      "pluginLogFile": "/var/log/aws-routed-eni/plugin.log",
+      "pluginLogLevel": "DEBUG"
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true},
+      "snat": true
+    }
+  ]
+}
+CNIEOF
+
+# Make sure necessary kernel modules are loaded
+modprobe overlay
+modprobe br_netfilter
+
+# Set kernel parameters required for Kubernetes networking
+cat > /etc/sysctl.d/99-kubernetes.conf << 'SYSCTLEOF'
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
+SYSCTLEOF
+sysctl --system
+
+# Install troubleshooting tools
+yum install -y tcpdump bind-utils nc
+
+# Fix potential SELinux issues
+if [ -f /etc/selinux/config ]; then
+  setenforce 0
+  sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+fi
+
+# Fix permissions on CNI directories
+chmod 755 /etc/cni/net.d
+chmod 755 /opt/cni/bin
+
 ## Fix DNS resolution for EC2 endpoint
 #echo '127.0.0.1 localhost' > /etc/hosts
 #hostname -I | awk '{print $1 " blik"}' >> /etc/hosts
@@ -96,10 +101,6 @@ Content-Type: text/x-shellscript; charset="us-ascii"
 ## Pre-pull container images to speed up pod startup
 #echo "Pre-pulling critical container images..."
 #crictl pull public.ecr.aws/eks-distro/kubernetes/pause:3.5
-#
-## Set correct file permissions for AWS CNI plugin
-#mkdir -p /var/run/aws-node
-#chmod 755 /var/run/aws-node
 #
 ## Static cluster information
 CLUSTER_NAME="hpc-custom"
