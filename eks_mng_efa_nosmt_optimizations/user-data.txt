@@ -1,0 +1,126 @@
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="//"
+
+--//
+Content-Type: text/x-shellscript; charset="us-ascii"
+
+#!/bin/bash
+echo "root:password" | chpasswd
+
+--//
+Content-Type: application/node.eks.aws
+
+apiVersion: node.eks.aws/v1alpha1
+kind: NodeConfig
+spec:
+  cluster:
+    name: mforde-hpc
+    apiServerEndpoint: https://EF1C1106E5D97379F403903E5420F6C3.gr7.us-west-2.eks.amazonaws.com
+    certificateAuthority: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJREpxZXduaU1JQ2t3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TlRBME1ETXhPREl4TlRaYUZ3MHpOVEEwTURFeE9ESTJOVFphTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUURGMGVMN2JkOTVJM1dLcllBMWJ3VVpwUnIxNS9tbmdhQXlQWllFVkRYMUNVUlF5cTRSbVE5Y09EWUUKNG1OVFRpdUFRaVhnSFNFWFNLNnJnd3RrSkE0cHozTVB2RWtPN3h6VEdNVzhOQkMvT1FJK0ttdGlrNVJLL1hQawpSMitub3Q4eFRZTzZPQXBDUzJOdXE3U2J6MGpmYkthOStWblFxZno4bW5YMDN0YVpOUTN2blg5ZDk3YnZzQW9DCjBTMmpwTS9ZL3VzUm5JQXdsRVdjcGVvemdRTFlIMWdsbTBoZVhuYmVucU9wU3pqVmJySEY5c1NSRWtqTXF2cEsKbEQxY3hZT1VwbHdnN2pyTjJ3dlBldWpwOTRvYVVYV1o2eDJPc2FicGNwVTR4QUFaVEQ2YWMrWVBxbHdFSWZ3RgpNczlUdHEwenRGdzVmRGNHdmd0Y1JuV1kyS1E1QWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJUaU1nMjN6MXJkR1ovRE03b0V2UEh6b1pFaXhUQVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQmdZSkc3L2owRgowTnIzZlE2MXltKzJPVXA0dXJqS29haEdmWW02Rm4wemRlSng0ZmJ1bldDZ0ZkZE9uOXdQK3B0OU52UnJwMUtpCkRKUlVXRklpKzFSZlYrSE9NcmFqc0ErZVNDTGNadUtwUlRQS2w5SlduNDhwdDRXb2V3QmRBVkNpSVMwOUU0clkKeXhDVFZJSVVVWjRBb21iY2l1NDNGUFJhTTVPWnlnSkNoL2tNSlZhQktDcC9lbVh2azgyeHRkVWRuM0Z1NTlFeAp6NDhsTmhJVngwMXp1SkRFRUh4RUt3eUpjV0paQVkvL3ZIcDRjSzN4MlROcVpjb0ZSZldWSkMrWTZtSnRXQWN4CnRBUUNESlhpbUlsak9KUEdyZ0pCbXQ4RmRIUU1iQkx6UFFJUUFXd0tJREIxV09raU5TSldaVXl5TkxOTG4zNmUKaXU4K1ZNa2kyclFnCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    cidr: 172.20.0.0/16
+  kubelet:
+    flags:
+    - "--node-labels=alpha.eksctl.io/cluster-name=mforde-hpc,alpha.eksctl.io/nodegroup-name=fullmng,eks.amazonaws.com/nodegroup-image=al2023,eks.amazonaws.com/capacityType=ON_DEMAND"
+    - "--cpu-manager-policy=static"
+    - "--feature-gates=CPUManagerPolicyOptions=true,CPUManagerPolicyAlphaOptions=true"
+    - "--cpu-manager-policy-options=strict-cpu-reservation=true"
+    - "--reserved-cpus=0,1"
+    - "--kube-reserved=cpu=1000m,memory=1Gi,ephemeral-storage=1Gi"
+    - "--system-reserved=cpu=1000m,memory=1Gi,ephemeral-storage=1Gi"
+    - "--kube-reserved-cgroup="
+    - "--system-reserved-cgroup="
+
+--//
+Content-Type: text/x-shellscript; charset="us-ascii"
+
+#!/bin/bash
+yum install -y amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+
+--//
+Content-Type: text/x-shellscript; charset="us-ascii"
+
+#!/bin/bash
+cat > /usr/local/sbin/set_irq_affinity.sh << 'EOF'
+#!/bin/bash
+CPU_MASK=3
+for IRQ_DIR in /proc/irq/[0-9]*; do
+  IRQ=$(basename "$IRQ_DIR")
+  if [ "$IRQ" -eq 0 ] || [ "$IRQ" -eq 2 ]; then
+    continue
+  fi
+  echo "Setting IRQ $IRQ to CPU mask $CPU_MASK"
+  echo "$CPU_MASK" > "$IRQ_DIR/smp_affinity"
+done
+for EFA_IRQ in $(grep -l efa /proc/irq/*/*/name | awk -F/ '{print $3}'); do
+  echo "Setting EFA IRQ $EFA_IRQ to CPU mask $CPU_MASK"
+  echo "$CPU_MASK" > "/proc/irq/$EFA_IRQ/smp_affinity"
+done
+EOF
+chmod +x /usr/local/sbin/set_irq_affinity.sh
+cat > /etc/systemd/system/irq-affinity.service << EOF
+[Unit]
+Description=Set IRQ Affinity for HPC Workloads
+After=network.target efa.service
+Wants=network.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/set_irq_affinity.sh
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable irq-affinity.service
+systemctl start irq-affinity.service
+
+--//
+Content-Type: text/x-shellscript; charset="us-ascii"
+
+#!/bin/bash
+mkdir -p /etc/systemd/system.conf.d/
+cat > /etc/systemd/system.conf.d/01-cpu-affinity.conf << EOF
+[Manager]
+CPUAffinity=0 1
+EOF
+systemctl daemon-reload
+
+--//
+Content-Type: text/x-shellscript; charset="us-ascii"
+
+#!/bin/bash
+cat > /etc/sysctl.d/90-efa-hpc.conf << EOF
+net.core.rmem_max = 25165824
+net.core.wmem_max = 25165824
+net.core.netdev_max_backlog = 8192
+net.core.busy_poll = 1
+net.core.busy_read = 50
+net.ipv4.tcp_low_latency = 1
+net.ipv4.tcp_sack = 0
+kernel.numa_balancing = 0
+kernel.randomize_va_space = 0
+vm.nr_hugepages = 20000
+EOF
+sysctl -p /etc/sysctl.d/90-efa-hpc.conf
+
+--//
+Content-Type: text/x-shellscript; charset="us-ascii"
+
+#!/bin/bash
+cat > /etc/systemd/system/disable-transparent-hugepage.service << EOF
+[Unit]
+Description=Disable transparent hugepage
+After=network.target
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled'
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable disable-transparent-hugepage.service
+systemctl start disable-transparent-hugepage.service
+
+--//--

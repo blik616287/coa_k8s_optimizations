@@ -1,5 +1,7 @@
 #!/bin/bash
 
+exec 2> errors
+
 export AWS_PAGER=""
 
 VPC_ID="vpc-07b388829583e6dc7"
@@ -46,6 +48,12 @@ aws ec2 create-security-group \
   --region ${AWS_REGION} \
   --profile ${AWS_PROFILE} \
   --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=eksctl-${CLUSTER_NAME}-cluster/ClusterSharedNodeSecurityGroup}]"
+SHARED_NODE_SG=$(aws ec2 describe-security-groups \
+  --filters "Name=tag:Name,Values=eksctl-${CLUSTER_NAME}-cluster/ClusterSharedNodeSecurityGroup" \
+  --query "SecurityGroups[0].GroupId" \
+  --output text \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE})
 aws ec2 authorize-security-group-ingress \
   --group-id $SHARED_NODE_SG \
   --ip-permissions 'IpProtocol=-1,UserIdGroupPairs=[{GroupId='$SHARED_NODE_SG',Description="Allow nodes to communicate with each other (all ports)"}]' \
@@ -56,12 +64,6 @@ aws ec2 authorize-security-group-ingress \
   --ip-permissions 'IpProtocol=-1,FromPort=0,ToPort=65535,UserIdGroupPairs=[{GroupId='$CLUSTER_SG_ID',Description="Allow managed and unmanaged nodes to communicate with each other (all ports)"}]' \
   --region ${AWS_REGION} \
   --profile ${AWS_PROFILE}
-SHARED_NODE_SG=$(aws ec2 describe-security-groups \
-  --filters "Name=tag:Name,Values=eksctl-${CLUSTER_NAME}-cluster/ClusterSharedNodeSecurityGroup" \
-  --query "SecurityGroups[0].GroupId" \
-  --output text \
-  --region ${AWS_REGION} \
-  --profile ${AWS_PROFILE})
 echo "SHARED_NODE_SG: ${SHARED_NODE_SG}"
 
 # Cluster service role
