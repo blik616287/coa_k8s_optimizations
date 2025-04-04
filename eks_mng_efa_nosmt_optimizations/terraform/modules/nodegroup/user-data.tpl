@@ -14,13 +14,13 @@ apiVersion: node.eks.aws/v1alpha1
 kind: NodeConfig
 spec:
   cluster:
-    name: mforde-hpc
-    apiServerEndpoint: https://EF1C1106E5D97379F403903E5420F6C3.gr7.us-west-2.eks.amazonaws.com
-    certificateAuthority: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJREpxZXduaU1JQ2t3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TlRBME1ETXhPREl4TlRaYUZ3MHpOVEEwTURFeE9ESTJOVFphTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUURGMGVMN2JkOTVJM1dLcllBMWJ3VVpwUnIxNS9tbmdhQXlQWllFVkRYMUNVUlF5cTRSbVE5Y09EWUUKNG1OVFRpdUFRaVhnSFNFWFNLNnJnd3RrSkE0cHozTVB2RWtPN3h6VEdNVzhOQkMvT1FJK0ttdGlrNVJLL1hQawpSMitub3Q4eFRZTzZPQXBDUzJOdXE3U2J6MGpmYkthOStWblFxZno4bW5YMDN0YVpOUTN2blg5ZDk3YnZzQW9DCjBTMmpwTS9ZL3VzUm5JQXdsRVdjcGVvemdRTFlIMWdsbTBoZVhuYmVucU9wU3pqVmJySEY5c1NSRWtqTXF2cEsKbEQxY3hZT1VwbHdnN2pyTjJ3dlBldWpwOTRvYVVYV1o2eDJPc2FicGNwVTR4QUFaVEQ2YWMrWVBxbHdFSWZ3RgpNczlUdHEwenRGdzVmRGNHdmd0Y1JuV1kyS1E1QWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJUaU1nMjN6MXJkR1ovRE03b0V2UEh6b1pFaXhUQVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQmdZSkc3L2owRgowTnIzZlE2MXltKzJPVXA0dXJqS29haEdmWW02Rm4wemRlSng0ZmJ1bldDZ0ZkZE9uOXdQK3B0OU52UnJwMUtpCkRKUlVXRklpKzFSZlYrSE9NcmFqc0ErZVNDTGNadUtwUlRQS2w5SlduNDhwdDRXb2V3QmRBVkNpSVMwOUU0clkKeXhDVFZJSVVVWjRBb21iY2l1NDNGUFJhTTVPWnlnSkNoL2tNSlZhQktDcC9lbVh2azgyeHRkVWRuM0Z1NTlFeAp6NDhsTmhJVngwMXp1SkRFRUh4RUt3eUpjV0paQVkvL3ZIcDRjSzN4MlROcVpjb0ZSZldWSkMrWTZtSnRXQWN4CnRBUUNESlhpbUlsak9KUEdyZ0pCbXQ4RmRIUU1iQkx6UFFJUUFXd0tJREIxV09raU5TSldaVXl5TkxOTG4zNmUKaXU4K1ZNa2kyclFnCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    name: ${cluster_name}
+    apiServerEndpoint: ${api_server_url}
+    certificateAuthority: ${b64_cluster_ca}
     cidr: 172.20.0.0/16
   kubelet:
     flags:
-    - "--node-labels=alpha.eksctl.io/cluster-name=mforde-hpc,alpha.eksctl.io/nodegroup-name=fullmng,eks.amazonaws.com/nodegroup-image=al2023,eks.amazonaws.com/capacityType=ON_DEMAND"
+    - "--node-labels=alpha.eksctl.io/cluster-name=${cluster_name},alpha.eksctl.io/nodegroup-name=${nodegroup_name},eks.amazonaws.com/nodegroup-image=al2023,eks.amazonaws.com/capacityType=ON_DEMAND"
     - "--cpu-manager-policy=static"
     - "--feature-gates=CPUManagerPolicyOptions=true,CPUManagerPolicyAlphaOptions=true"
     - "--cpu-manager-policy-options=strict-cpu-reservation=true"
