@@ -282,7 +282,7 @@ aws ec2 authorize-security-group-egress \
   --region ${AWS_REGION} \
   --profile ${AWS_PROFILE}
 echo "EFA_SG_ID: ${EFA_SG_ID}"
-  
+
 # Generate VPC Endpoints
 aws ec2 create-security-group \
   --group-name "eks-endpoint-sg-hpc-custom" \
@@ -404,7 +404,57 @@ aws ec2 create-vpc-endpoint \
   --tag-specifications "ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=$CLUSTER_NAME-ssmmessages-endpoint},{Key=Cluster,Value=$CLUSTER_NAME}]" \
   --region "$AWS_REGION" \
   --profile "$AWS_PROFILE"
-  
+
+# SSM Endpoint SG
+SSM_ENDPOINT_SG_ID=$(aws ec2 describe-vpc-endpoints \
+  --filters "Name=service-name,Values=com.amazonaws.${AWS_REGION}.ssm" \
+  --query "VpcEndpoints[0].Groups[0].GroupId" \
+  --output text \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE})
+aws ec2 authorize-security-group-ingress \
+  --group-id $SSM_ENDPOINT_SG_ID \
+  --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId='$CLUSTER_SG_ID',Description="Allow HTTPS from cluster security group"}]' \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE}
+aws ec2 authorize-security-group-ingress \
+  --group-id $SSM_ENDPOINT_SG_ID \
+  --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId='$EFA_SG_ID',Description="Allow HTTPS from EFA security group"}]' \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE}
+SSMMESSAGES_ENDPOINT_SG_ID=$(aws ec2 describe-vpc-endpoints \
+  --filters "Name=service-name,Values=com.amazonaws.${AWS_REGION}.ssmmessages" \
+  --query "VpcEndpoints[0].Groups[0].GroupId" \
+  --output text \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE})
+EC2MESSAGES_ENDPOINT_SG_ID=$(aws ec2 describe-vpc-endpoints \
+  --filters "Name=service-name,Values=com.amazonaws.${AWS_REGION}.ec2messages" \
+  --query "VpcEndpoints[0].Groups[0].GroupId" \
+  --output text \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE})
+aws ec2 authorize-security-group-ingress \
+  --group-id $SSMMESSAGES_ENDPOINT_SG_ID \
+  --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId='$CLUSTER_SG_ID',Description="Allow HTTPS from cluster security group"}]' \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE}
+aws ec2 authorize-security-group-ingress \
+  --group-id $SSMMESSAGES_ENDPOINT_SG_ID \
+  --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId='$EFA_SG_ID',Description="Allow HTTPS from EFA security group"}]' \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE}
+aws ec2 authorize-security-group-ingress \
+  --group-id $EC2MESSAGES_ENDPOINT_SG_ID \
+  --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId='$CLUSTER_SG_ID',Description="Allow HTTPS from cluster security group"}]' \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE}
+aws ec2 authorize-security-group-ingress \
+  --group-id $EC2MESSAGES_ENDPOINT_SG_ID \
+  --ip-permissions 'IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId='$EFA_SG_ID',Description="Allow HTTPS from EFA security group"}]' \
+  --region ${AWS_REGION} \
+  --profile ${AWS_PROFILE}
+
 # User-Data
 API_SERVER_URL=$(aws eks describe-cluster --name ${CLUSTER_NAME} --region ${AWS_REGION} --profile ${AWS_PROFILE} --query "cluster.endpoint" --output text)
 B64_CLUSTER_CA=$(aws eks describe-cluster --name ${CLUSTER_NAME} --region ${AWS_REGION} --profile ${AWS_PROFILE} --query "cluster.certificateAuthority.data" --output text)
