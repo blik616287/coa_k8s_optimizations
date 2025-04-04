@@ -1,3 +1,5 @@
+#!/bin/bash
+
 export AWS_PAGER=""
 
 VPC_ID="vpc-07b388829583e6dc7"
